@@ -136,9 +136,100 @@ class Portfolio:
 
 
 class Wallet:
-    """Модель кошелька."""
+    """Кошелёк пользователя для одной конкретной валюты.
 
-    pass
+    Attributes:
+        currency_code: Код валюты (например, "USD", "BTC").
+        _balance: Баланс в данной валюте.
+    """
+
+    def __init__(self, currency_code: str, balance: float = 0.0) -> None:
+        """Инициализация кошелька.
+
+        Args:
+            currency_code: Код валюты (например, "USD", "BTC").
+            balance: Начальный баланс (по умолчанию 0.0).
+
+        Raises:
+            ValueError: Если код валюты пустой.
+        """
+        if not currency_code or not currency_code.strip():
+            raise ValueError("Код валюты не может быть пустым")
+        self.currency_code = currency_code.strip().upper()
+        self.balance = balance  # через сеттер с проверкой
+
+    # --- Геттеры и сеттеры ---
+
+    @property
+    def balance(self) -> float:
+        """Получить текущий баланс."""
+        return self._balance
+
+    @balance.setter
+    def balance(self, value: float) -> None:
+        """Установить баланс.
+
+        Args:
+            value: Новое значение баланса.
+
+        Raises:
+            TypeError: Если значение не число.
+            ValueError: Если значение отрицательное.
+        """
+        if not isinstance(value, (int, float)):
+            raise TypeError("Баланс должен быть числом")
+        if value < 0:
+            raise ValueError("Баланс не может быть отрицательным")
+        self._balance = float(value)
+
+    # --- Методы ---
+
+    def deposit(self, amount: float) -> None:
+        """Пополнение баланса.
+
+        Args:
+            amount: Сумма пополнения.
+
+        Raises:
+            TypeError: Если сумма не число.
+            ValueError: Если сумма не положительная.
+        """
+        if not isinstance(amount, (int, float)):
+            raise TypeError("Сумма должна быть числом")
+        if amount <= 0:
+            raise ValueError("Сумма пополнения должна быть положительной")
+        self._balance += amount
+
+    def withdraw(self, amount: float) -> None:
+        """Снятие средств.
+
+        Args:
+            amount: Сумма снятия.
+
+        Raises:
+            TypeError: Если сумма не число.
+            ValueError: Если сумма не положительная или превышает баланс.
+        """
+        if not isinstance(amount, (int, float)):
+            raise TypeError("Сумма должна быть числом")
+        if amount <= 0:
+            raise ValueError("Сумма снятия должна быть положительной")
+        if amount > self._balance:
+            raise ValueError(
+                f"Недостаточно средств. Баланс: {self._balance}, запрошено: {amount}"
+            )
+        self._balance -= amount
+
+    def get_balance_info(self) -> dict:
+        """Получить информацию о текущем балансе.
+
+        Returns:
+            Словарь с информацией о кошельке.
+        """
+        return {
+            "currency_code": self.currency_code,
+            "balance": self._balance,
+        }
 
 
 class Currency:
