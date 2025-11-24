@@ -45,6 +45,22 @@ def cmd_register(args: argparse.Namespace) -> None:
         _print_error(str(e))
 
 
+def cmd_login(args: argparse.Namespace) -> None:
+    """Команда login — авторизация пользователя.
+
+    Аргументы:
+        --username <str> — обязателен.
+        --password <str> — обязателен.
+    """
+    global _current_user
+    try:
+        user = usecases.login_user(args.username, args.password)
+        _current_user = user
+        _print_success(f"Добро пожаловать, {user.username}!")
+    except ValueError as e:
+        _print_error(str(e))
+
+
 # =============================================================================
 # CLI Setup
 # =============================================================================
@@ -76,6 +92,25 @@ def create_parser() -> argparse.ArgumentParser:
         help="Пароль (минимум 4 символа)",
     )
     register_parser.set_defaults(func=cmd_register)
+
+    # --- login ---
+    login_parser = subparsers.add_parser(
+        "login",
+        help="Авторизация пользователя",
+    )
+    login_parser.add_argument(
+        "--username",
+        type=str,
+        required=True,
+        help="Имя пользователя",
+    )
+    login_parser.add_argument(
+        "--password",
+        type=str,
+        required=True,
+        help="Пароль",
+    )
+    login_parser.set_defaults(func=cmd_login)
 
     return parser
 
