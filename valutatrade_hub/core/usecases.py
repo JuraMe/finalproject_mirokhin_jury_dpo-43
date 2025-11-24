@@ -200,17 +200,32 @@ def _save_portfolio(portfolio: Portfolio) -> None:
     save_json("portfolios.json", portfolios_data)
 
 
-def get_portfolio_info(user: User) -> dict:
+def get_portfolio_info(user: User, base_currency: str = "USD") -> dict:
     """Получить информацию о портфеле.
 
     Args:
         user: Объект пользователя.
+        base_currency: Базовая валюта для расчёта общей стоимости.
 
     Returns:
         Словарь с информацией о портфеле.
     """
     portfolio = get_portfolio(user)
-    return portfolio.get_portfolio_info()
+    rates = get_rates()
+
+    return {
+        "user_id": user.user_id,
+        "username": user.username,
+        "wallets": {
+            code: {
+                "balance": wallet.balance,
+                "value_in_base": wallet.balance * rates.get(code, 1.0) / rates.get(base_currency, 1.0)
+            }
+            for code, wallet in portfolio._wallets.items()
+        },
+        "total_value": portfolio.get_total_value(base_currency, rates),
+        "base_currency": base_currency,
+    }
 
 
 # =============================================================================
