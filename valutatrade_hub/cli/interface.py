@@ -155,6 +155,34 @@ def cmd_show_portfolio(args: argparse.Namespace) -> None:
         _print_error(str(e))
 
 
+def cmd_buy(args: argparse.Namespace) -> None:
+    """Команда buy — купить валюту за USD.
+
+    Аргументы:
+        --currency <str> — код покупаемой валюты.
+        --amount <float> — количество покупаемой валюты.
+    """
+    if _current_user is None:
+        _print_error("Требуется авторизация. Выполните команду login.")
+        return
+
+    try:
+        result = usecases.buy_currency(_current_user, args.currency, args.amount)
+
+        print(f"\n{'='*50}")
+        print("Покупка валюты выполнена успешно!")
+        print(f"{'='*50}")
+        print(f"Валюта:          {result['currency']}")
+        print(f"Количество:      {result['amount']:.4f}")
+        print(f"Курс к USD:      {result['rate']:.4f}")
+        print(f"Стоимость в USD: {result['cost_usd']:.2f}")
+        print(f"{'='*50}\n")
+
+        _print_success(f"Куплено {result['amount']:.4f} {result['currency']} за {result['cost_usd']:.2f} USD")
+    except (ValueError, PermissionError) as e:
+        _print_error(str(e))
+
+
 # =============================================================================
 # CLI Setup
 # =============================================================================
@@ -225,6 +253,25 @@ def create_parser() -> argparse.ArgumentParser:
         help="Базовая валюта для расчёта (по умолчанию USD)",
     )
     show_portfolio_parser.set_defaults(func=cmd_show_portfolio)
+
+    # --- buy ---
+    buy_parser = subparsers.add_parser(
+        "buy",
+        help="Купить валюту за USD",
+    )
+    buy_parser.add_argument(
+        "--currency",
+        type=str,
+        required=True,
+        help="Код покупаемой валюты (например, BTC, EUR)",
+    )
+    buy_parser.add_argument(
+        "--amount",
+        type=float,
+        required=True,
+        help="Количество покупаемой валюты",
+    )
+    buy_parser.set_defaults(func=cmd_buy)
 
     return parser
 
