@@ -183,6 +183,34 @@ def cmd_buy(args: argparse.Namespace) -> None:
         _print_error(str(e))
 
 
+def cmd_sell(args: argparse.Namespace) -> None:
+    """Команда sell — продать валюту за USD.
+
+    Аргументы:
+        --currency <str> — код продаваемой валюты.
+        --amount <float> — количество продаваемой валюты.
+    """
+    if _current_user is None:
+        _print_error("Требуется авторизация. Выполните команду login.")
+        return
+
+    try:
+        result = usecases.sell_currency(_current_user, args.currency, args.amount)
+
+        print(f"\n{'='*50}")
+        print("Продажа валюты выполнена успешно!")
+        print(f"{'='*50}")
+        print(f"Валюта:           {result['currency']}")
+        print(f"Количество:       {result['amount']:.4f}")
+        print(f"Курс к USD:       {result['rate']:.4f}")
+        print(f"Получено USD:     {result['received_usd']:.2f}")
+        print(f"{'='*50}\n")
+
+        _print_success(f"Продано {result['amount']:.4f} {result['currency']} за {result['received_usd']:.2f} USD")
+    except (ValueError, PermissionError) as e:
+        _print_error(str(e))
+
+
 # =============================================================================
 # CLI Setup
 # =============================================================================
@@ -272,6 +300,25 @@ def create_parser() -> argparse.ArgumentParser:
         help="Количество покупаемой валюты",
     )
     buy_parser.set_defaults(func=cmd_buy)
+
+    # --- sell ---
+    sell_parser = subparsers.add_parser(
+        "sell",
+        help="Продать валюту за USD",
+    )
+    sell_parser.add_argument(
+        "--currency",
+        type=str,
+        required=True,
+        help="Код продаваемой валюты (например, BTC, EUR)",
+    )
+    sell_parser.add_argument(
+        "--amount",
+        type=float,
+        required=True,
+        help="Количество продаваемой валюты",
+    )
+    sell_parser.set_defaults(func=cmd_sell)
 
     return parser
 
