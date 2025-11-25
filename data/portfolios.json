@@ -17,10 +17,10 @@
     "user_id": 2,
     "wallets": {
       "USD": {
-        "balance": 9873.0
+        "balance": 9936.5
       },
       "GBP": {
-        "balance": 100.0
+        "balance": 50.0
       }
     }
   }
