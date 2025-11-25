@@ -211,6 +211,35 @@ def cmd_sell(args: argparse.Namespace) -> None:
         _print_error(str(e))
 
 
+def cmd_get_rate(args: argparse.Namespace) -> None:
+    """Команда get-rate — получить курс обмена валют.
+
+    Аргументы:
+        --from <str> — исходная валюта (например, USD).
+        --to <str> — целевая валюта (например, BTC).
+    """
+    try:
+        result = usecases.get_exchange_rate_between(args.from_currency, args.to)
+
+        print(f"\n{'='*50}")
+        print("Курс обмена валют")
+        print(f"{'='*50}")
+        print(f"{result['description']}")
+        print(f"\nИсходная валюта:  {result['from_currency']}")
+        print(f"Целевая валюта:   {result['to_currency']}")
+        print(f"Курс обмена:      {result['rate']:.6f}")
+        print(f"Базовая валюта:   {result['base_currency']}")
+
+        if result['updated_at']:
+            print(f"Обновлено:        {result['updated_at']}")
+        else:
+            print(f"Обновлено:        Дефолтные курсы")
+
+        print(f"{'='*50}\n")
+    except ValueError as e:
+        _print_error(str(e))
+
+
 # =============================================================================
 # CLI Setup
 # =============================================================================
@@ -319,6 +348,26 @@ def create_parser() -> argparse.ArgumentParser:
         help="Количество продаваемой валюты",
     )
     sell_parser.set_defaults(func=cmd_sell)
+
+    # --- get-rate ---
+    get_rate_parser = subparsers.add_parser(
+        "get-rate",
+        help="Получить курс обмена валют",
+    )
+    get_rate_parser.add_argument(
+        "--from",
+        dest="from_currency",
+        type=str,
+        required=True,
+        help="Исходная валюта (например, USD)",
+    )
+    get_rate_parser.add_argument(
+        "--to",
+        type=str,
+        required=True,
+        help="Целевая валюта (например, BTC)",
+    )
+    get_rate_parser.set_defaults(func=cmd_get_rate)
 
     return parser
 

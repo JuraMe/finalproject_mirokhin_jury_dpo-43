@@ -433,3 +433,40 @@ def get_all_rates() -> dict:
         Информация о всех курсах.
     """
     return get_rates_info()
+
+
+def get_exchange_rate_between(from_currency: str, to_currency: str) -> dict:
+    """Получить курс обмена между двумя валютами.
+
+    Args:
+        from_currency: Исходная валюта.
+        to_currency: Целевая валюта.
+
+    Returns:
+        Информация о курсе обмена.
+    """
+    from_code = validate_currency_code(from_currency)
+    to_code = validate_currency_code(to_currency)
+
+    rates_info = get_rates_info()
+    rates = rates_info["rates"]
+    updated_at = rates_info["updated_at"]
+
+    if from_code not in rates:
+        raise ValueError(f"Курс для валюты {from_code} не найден")
+    if to_code not in rates:
+        raise ValueError(f"Курс для валюты {to_code} не найден")
+
+    # Конвертация через USD
+    from_rate = rates[from_code]
+    to_rate = rates[to_code]
+    exchange_rate = from_rate / to_rate
+
+    return {
+        "from_currency": from_code,
+        "to_currency": to_code,
+        "rate": exchange_rate,
+        "description": f"1 {from_code} = {exchange_rate:.6f} {to_code}",
+        "updated_at": updated_at,
+        "base_currency": rates_info.get("base_currency", "USD"),
+    }
