@@ -11,11 +11,15 @@
 
 
 class CurrencyNotFoundError(ValueError):
-    """Исключение, когда валюта с указанным кодом не найдена в реестре."""
+    """Исключение, когда валюта с указанным кодом не найдена в реестре.
+
+    Сообщение: "Неизвестная валюта '{code}'"
+    Выбрасывается: currencies.get_currency(), валидация в get-rate
+    """
 
     def __init__(self, code: str):
         self.code = code
-        super().__init__(f"Валюта с кодом '{code}' не найдена в реестре")
+        super().__init__(f"Неизвестная валюта '{code}'")
 
 
 class InvalidCurrencyCodeError(ValueError):
@@ -84,15 +88,19 @@ class WalletNotFoundError(ValueError):
 
 
 class InsufficientFundsError(ValueError):
-    """Исключение при недостаточном балансе для операции."""
+    """Исключение при недостаточном балансе для операции.
+
+    Сообщение: "Недостаточно средств: доступно {available} {code}, требуется {required} {code}"
+    Выбрасывается: Wallet.withdraw(), usecases.sell_currency()
+    """
 
     def __init__(self, currency_code: str, required: float, available: float):
         self.currency_code = currency_code
         self.required = required
         self.available = available
         super().__init__(
-            f"Недостаточно средств в кошельке {currency_code}: "
-            f"требуется {required}, доступно {available}"
+            f"Недостаточно средств: доступно {available} {currency_code}, "
+            f"требуется {required} {currency_code}"
         )
 
 
@@ -137,3 +145,20 @@ class DataNotFoundError(FileNotFoundError):
     def __init__(self, filename: str):
         self.filename = filename
         super().__init__(f"Файл данных '{filename}' не найден")
+
+
+# =============================================================================
+# Исключения для внешних API
+# =============================================================================
+
+
+class ApiRequestError(Exception):
+    """Исключение при сбое обращения к внешнему API.
+
+    Сообщение: "Ошибка при обращении к внешнему API: {reason}"
+    Выбрасывается: Слой получения курсов валют (parser/service)
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(f"Ошибка при обращении к внешнему API: {reason}")
