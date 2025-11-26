@@ -108,7 +108,7 @@ class SettingsLoader:
         """
         try:
             if self._config_path.exists():
-                with open(self._config_path, "r", encoding="utf-8") as f:
+                with open(self._config_path, encoding="utf-8") as f:
                     data = json.load(f)
                     self._settings = {**self._defaults, **data}
             else:
@@ -116,7 +116,10 @@ class SettingsLoader:
                 self._settings = self._defaults.copy()
         except (json.JSONDecodeError, OSError) as e:
             # При ошибке чтения используем дефолты
-            print(f"Предупреждение: Не удалось загрузить конфигурацию ({e}), используются дефолтные значения")
+            print(
+                f"Предупреждение: Не удалось загрузить конфигурацию ({e}), "
+                f"используются дефолтные значения"
+            )
             self._settings = self._defaults.copy()
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -193,7 +196,10 @@ class SettingsLoader:
 
     def __repr__(self) -> str:
         """Представление объекта для отладки."""
-        return f"SettingsLoader(config_path='{self._config_path}', settings_count={len(self._settings)})"
+        return (
+            f"SettingsLoader(config_path='{self._config_path}', "
+            f"settings_count={len(self._settings)})"
+        )
 
 
 # Удобная функция для получения настроек
