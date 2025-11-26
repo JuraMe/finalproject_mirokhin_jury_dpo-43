@@ -6,10 +6,9 @@
 
 from datetime import datetime
 
-from valutatrade_hub.core.currencies import get_currency, is_currency_registered
+from valutatrade_hub.core.currencies import get_currency
 from valutatrade_hub.core.exceptions import (
     CurrencyNotFoundError,
-    InsufficientFundsError,
 )
 from valutatrade_hub.core.models import Portfolio, User, Wallet
 from valutatrade_hub.core.utils import (
@@ -23,7 +22,6 @@ from valutatrade_hub.core.utils import (
     validate_currency_code,
 )
 from valutatrade_hub.decorators import log_action
-from valutatrade_hub.infra.settings import get_settings
 
 # =============================================================================
 # User Management
@@ -58,13 +56,15 @@ def register_user(username: str, password: str) -> User:
     user = User(user_id, username, password)
 
     # Сохранение в JSON
-    users_data.append({
-        "user_id": user.user_id,
-        "username": user.username,
-        "hashed_password": user._hashed_password,
-        "salt": user.salt,
-        "registration_date": user.registration_date.isoformat(),
-    })
+    users_data.append(
+        {
+            "user_id": user.user_id,
+            "username": user.username,
+            "hashed_password": user._hashed_password,
+            "salt": user.salt,
+            "registration_date": user.registration_date.isoformat(),
+        }
+    )
     save_json("users.json", users_data)
 
     # Создаём пустой портфель для пользователя
@@ -147,10 +147,12 @@ def _create_portfolio(user: User) -> None:
         user: Объект пользователя.
     """
     portfolios_data = load_json("portfolios.json")
-    portfolios_data.append({
-        "user_id": user.user_id,
-        "wallets": {},
-    })
+    portfolios_data.append(
+        {
+            "user_id": user.user_id,
+            "wallets": {},
+        }
+    )
     save_json("portfolios.json", portfolios_data)
 
 
@@ -198,13 +200,15 @@ def _save_portfolio(portfolio: Portfolio) -> None:
             break
     else:
         # Если портфель не найден, создаём новый
-        portfolios_data.append({
-            "user_id": portfolio.user_id,
-            "wallets": {
-                code: {"balance": wallet.balance}
-                for code, wallet in portfolio._wallets.items()
-            },
-        })
+        portfolios_data.append(
+            {
+                "user_id": portfolio.user_id,
+                "wallets": {
+                    code: {"balance": wallet.balance}
+                    for code, wallet in portfolio._wallets.items()
+                },
+            }
+        )
 
     save_json("portfolios.json", portfolios_data)
 
@@ -228,7 +232,9 @@ def get_portfolio_info(user: User, base_currency: str = "USD") -> dict:
         "wallets": {
             code: {
                 "balance": wallet.balance,
-                "value_in_base": wallet.balance * rates.get(code, 1.0) / rates.get(base_currency, 1.0)
+                "value_in_base": wallet.balance
+                * rates.get(code, 1.0)
+                / rates.get(base_currency, 1.0),
             }
             for code, wallet in portfolio._wallets.items()
         },
