@@ -88,7 +88,8 @@ def cmd_register(args: argparse.Namespace) -> None:
     try:
         user = usecases.register_user(args.username, args.password)
         _print_success(
-            f"Пользователь '{user.username}' успешно зарегистрирован (ID: {user.user_id})"
+            f"Пользователь '{user.username}' "
+            f"успешно зарегистрирован (ID: {user.user_id})"
         )
     except ValueError as e:
         _print_error(str(e))
@@ -137,9 +138,9 @@ def cmd_show_portfolio(args: argparse.Namespace) -> None:
         base = args.base if hasattr(args, "base") and args.base else "USD"
         info = usecases.get_portfolio_info(_current_user, base)
 
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Портфель пользователя: {info['username']} (ID: {info['user_id']})")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
 
         if not info["wallets"]:
             print("\nКошельков нет. Используйте команду 'deposit' для пополнения.")
@@ -155,7 +156,7 @@ def cmd_show_portfolio(args: argparse.Namespace) -> None:
             print("-" * 50)
             print(f"{'ИТОГО':<10} {'':<15} {info['total_value']:>20.4f} {base}")
 
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
     except (ValueError, PermissionError) as e:
         _print_error(str(e))
 
@@ -174,20 +175,25 @@ def cmd_buy(args: argparse.Namespace) -> None:
     try:
         result = usecases.buy_currency(_current_user, args.currency, args.amount)
 
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print("Покупка валюты выполнена успешно!")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
         print(f"Валюта:          {result['currency']}")
         print(f"Количество:      {result['amount']:.4f}")
         print(f"Курс к USD:      {result['rate']:.4f}")
         print(f"Стоимость в USD: {result['cost_usd']:.2f}")
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
 
-        _print_success(f"Куплено {result['amount']:.4f} {result['currency']} за {result['cost_usd']:.2f} USD")
+        _print_success(
+            f"Куплено {result['amount']:.4f} {result['currency']} "
+            f"за {result['cost_usd']:.2f} USD"
+        )
 
     except CurrencyNotFoundError as e:
         _print_error(str(e))
-        print("Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH")
+        print(
+            "Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH"
+        )
         print("Используйте 'valutatrade get-rate --help' для получения курсов")
 
     except InsufficientFundsError as e:
@@ -211,20 +217,25 @@ def cmd_sell(args: argparse.Namespace) -> None:
     try:
         result = usecases.sell_currency(_current_user, args.currency, args.amount)
 
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print("Продажа валюты выполнена успешно!")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
         print(f"Валюта:           {result['currency']}")
         print(f"Количество:       {result['amount']:.4f}")
         print(f"Курс к USD:       {result['rate']:.4f}")
         print(f"Получено USD:     {result['received_usd']:.2f}")
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
 
-        _print_success(f"Продано {result['amount']:.4f} {result['currency']} за {result['received_usd']:.2f} USD")
+        _print_success(
+            f"Продано {result['amount']:.4f} {result['currency']} "
+            f"за {result['received_usd']:.2f} USD"
+        )
 
     except CurrencyNotFoundError as e:
         _print_error(str(e))
-        print("Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH")
+        print(
+            "Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH"
+        )
         print("Используйте 'valutatrade get-rate --help' для получения курсов")
 
     except InsufficientFundsError as e:
@@ -244,25 +255,27 @@ def cmd_get_rate(args: argparse.Namespace) -> None:
     try:
         result = usecases.get_exchange_rate_between(args.from_currency, args.to)
 
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print("Курс обмена валют")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
         print(f"{result['description']}")
         print(f"\nИсходная валюта:  {result['from_currency']}")
         print(f"Целевая валюта:   {result['to_currency']}")
         print(f"Курс обмена:      {result['rate']:.6f}")
         print(f"Базовая валюта:   {result['base_currency']}")
 
-        if result['updated_at']:
+        if result["updated_at"]:
             print(f"Обновлено:        {result['updated_at']}")
         else:
-            print(f"Обновлено:        Дефолтные курсы")
+            print("Обновлено:        Дефолтные курсы")
 
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
 
     except CurrencyNotFoundError as e:
         _print_error(str(e))
-        print("Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH")
+        print(
+            "Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH"
+        )
         print("Используйте 'valutatrade get-rate --from USD --to BTC' для примера")
 
     except ApiRequestError as e:
