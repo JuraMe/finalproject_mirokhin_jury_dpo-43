@@ -4,6 +4,11 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from valutatrade_hub.core.exceptions import (
+    CurrencyNotFoundError,
+    InvalidAmountError,
+)
+
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 # =============================================================================
@@ -53,12 +58,12 @@ def validate_amount(amount: float) -> float:
 
     Raises:
         TypeError: Если amount не число.
-        ValueError: Если amount <= 0.
+        InvalidAmountError: Если amount <= 0.
     """
     if not isinstance(amount, (int, float)):
         raise TypeError("Сумма должна быть числом")
     if amount <= 0:
-        raise ValueError("Сумма должна быть положительной")
+        raise InvalidAmountError(amount, "сумма должна быть положительной")
     return float(amount)
 
 
@@ -136,12 +141,12 @@ def get_rate(currency_code: str) -> float:
         Курс валюты к USD.
 
     Raises:
-        ValueError: Если валюта не найдена.
+        CurrencyNotFoundError: Если валюта не найдена.
     """
     code = validate_currency_code(currency_code)
     rates = get_rates()
     if code not in rates:
-        raise ValueError(f"Курс для валюты {code} не найден")
+        raise CurrencyNotFoundError(code)
     return rates[code]
 
 
@@ -196,6 +201,10 @@ def convert_currency(
 
     Returns:
         Сумма в целевой валюте.
+
+    Raises:
+        CurrencyNotFoundError: Если валюта не найдена.
+        InvalidAmountError: Если сумма некорректная.
     """
     amount = validate_amount(amount)
     from_code = validate_currency_code(from_currency)
@@ -205,9 +214,9 @@ def convert_currency(
         rates = get_rates()
 
     if from_code not in rates:
-        raise ValueError(f"Курс для валюты {from_code} не найден")
+        raise CurrencyNotFoundError(from_code)
     if to_code not in rates:
-        raise ValueError(f"Курс для валюты {to_code} не найден")
+        raise CurrencyNotFoundError(to_code)
 
     # Конвертация через USD
     amount_usd = amount * rates[from_code]
