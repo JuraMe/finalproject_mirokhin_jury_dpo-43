@@ -6,8 +6,9 @@
 
 import json
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from valutatrade_hub.core.exceptions import DataNotFoundError
 from valutatrade_hub.infra.settings import get_settings
@@ -131,7 +132,7 @@ class DatabaseManager:
         # Загружаем данные с блокировкой
         with self._lock:
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Сохраняем в кеш
@@ -145,7 +146,7 @@ class DatabaseManager:
                     f"Ошибка чтения файла {filename}: {e.msg}",
                     e.doc,
                     e.pos,
-                )
+                ) from e
 
     def save(self, filename: str, data: Any, invalidate_cache: bool = True) -> None:
         """Сохранить данные в JSON файл.
@@ -180,7 +181,7 @@ class DatabaseManager:
                     self._cache[filename] = data
 
             except (TypeError, OSError) as e:
-                raise OSError(f"Ошибка записи файла {filename}: {str(e)}")
+                raise OSError(f"Ошибка записи файла {filename}: {str(e)}") from e
 
     def update(
         self, filename: str, updater: Callable[[Any], Any], use_cache: bool = True
@@ -273,7 +274,10 @@ class DatabaseManager:
         """Представление объекта для отладки."""
         data_path = self._settings.get_data_path()
         cache_size = len(self._cache)
-        return f"DatabaseManager(data_path='{data_path}', cache_size={cache_size}, cache_enabled={self._use_cache})"
+        return (
+            f"DatabaseManager(data_path='{data_path}', "
+            f"cache_size={cache_size}, cache_enabled={self._use_cache})"
+        )
 
 
 # Удобная функция для получения DatabaseManager
