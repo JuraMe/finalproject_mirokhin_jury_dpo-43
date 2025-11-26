@@ -4,6 +4,11 @@ import hashlib
 import secrets
 from datetime import datetime
 
+from valutatrade_hub.core.exceptions import (
+    InsufficientFundsError,
+    InvalidAmountError,
+)
+
 
 class User:
     """Модель пользователя системы.
@@ -379,12 +384,12 @@ class Wallet:
 
         Raises:
             TypeError: Если сумма не число.
-            ValueError: Если сумма не положительная.
+            InvalidAmountError: Если сумма не положительная.
         """
         if not isinstance(amount, (int, float)):
             raise TypeError("Сумма должна быть числом")
         if amount <= 0:
-            raise ValueError("Сумма пополнения должна быть положительной")
+            raise InvalidAmountError(amount, "сумма должна быть положительной")
         self._balance += amount
 
     def withdraw(self, amount: float) -> None:
@@ -395,15 +400,16 @@ class Wallet:
 
         Raises:
             TypeError: Если сумма не число.
-            ValueError: Если сумма не положительная или превышает баланс.
+            InvalidAmountError: Если сумма не положительная.
+            InsufficientFundsError: Если сумма превышает баланс.
         """
         if not isinstance(amount, (int, float)):
             raise TypeError("Сумма должна быть числом")
         if amount <= 0:
-            raise ValueError("Сумма снятия должна быть положительной")
+            raise InvalidAmountError(amount, "сумма должна быть положительной")
         if amount > self._balance:
-            raise ValueError(
-                f"Недостаточно средств. Баланс: {self._balance}, запрошено: {amount}"
+            raise InsufficientFundsError(
+                self.currency_code, required=amount, available=self._balance
             )
         self._balance -= amount
 
@@ -417,9 +423,3 @@ class Wallet:
             "currency_code": self.currency_code,
             "balance": self._balance,
         }
-
-
-class Currency:
-    """Модель валюты."""
-
-    pass
