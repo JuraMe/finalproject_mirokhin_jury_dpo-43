@@ -11,13 +11,13 @@ import logging
 import logging.handlers
 from pathlib import Path
 
-
 # Директория для логов
 LOGS_DIR = Path(__file__).parent.parent / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 
 # Формат логов (человекочитаемый)
-# Пример: "INFO 2025-10-09T12:05:22 BUY user='alice' currency='BTC' amount=0.0500 rate=59300.00 base='USD' result=OK"
+# Пример: "INFO 2025-10-09T12:05:22 BUY user='alice' currency='BTC'
+#          amount=0.0500 rate=59300.00 base='USD' result=OK"
 LOG_FORMAT = "%(levelname)-8s %(asctime)s | %(name)s | %(message)s"
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
