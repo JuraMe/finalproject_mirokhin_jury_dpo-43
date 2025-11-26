@@ -5,7 +5,8 @@
 """
 
 import functools
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from valutatrade_hub.logging_config import get_action_logger
 
@@ -39,7 +40,8 @@ def log_action(
             # ... код операции
             pass
 
-        # Лог: INFO 2025-10-09T12:05:22 BUY user='alice' currency='BTC' amount=0.0500 rate=59300.00 base='USD' result=OK
+        # Лог: INFO 2025-10-09T12:05:22 BUY user='alice' currency='BTC'
+        #      amount=0.0500 rate=59300.00 base='USD' result=OK
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
