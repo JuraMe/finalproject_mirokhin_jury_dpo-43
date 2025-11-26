@@ -6,6 +6,11 @@
 
 from datetime import datetime
 
+from valutatrade_hub.core.currencies import get_currency, is_currency_registered
+from valutatrade_hub.core.exceptions import (
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
 from valutatrade_hub.core.models import Portfolio, User, Wallet
 from valutatrade_hub.core.utils import (
     get_rate,
@@ -17,12 +22,15 @@ from valutatrade_hub.core.utils import (
     validate_amount,
     validate_currency_code,
 )
+from valutatrade_hub.decorators import log_action
+from valutatrade_hub.infra.settings import get_settings
 
 # =============================================================================
 # User Management
 # =============================================================================
 
 
+@log_action("REGISTER")
 def register_user(username: str, password: str) -> User:
     """Регистрация нового пользователя.
 
@@ -65,6 +73,7 @@ def register_user(username: str, password: str) -> User:
     return user
 
 
+@log_action("LOGIN")
 def login_user(username: str, password: str) -> User:
     """Авторизация пользователя.
 
@@ -335,6 +344,7 @@ def get_balance(user: User, currency_code: str) -> dict:
 # =============================================================================
 
 
+@log_action("BUY", verbose=True)
 def buy_currency(user: User, currency_code: str, amount: float) -> dict:
     """Купить валюту за USD.
 
@@ -345,17 +355,30 @@ def buy_currency(user: User, currency_code: str, amount: float) -> dict:
 
     Returns:
         Результат операции.
+
+    Raises:
+        CurrencyNotFoundError: Если валюта не найдена в реестре.
+        InsufficientFundsError: Если недостаточно USD для покупки.
+        ValueError: Если amount <= 0.
     """
     require_login(user)
-    code = validate_currency_code(currency_code)
+
+    # Валидация количества
     amount = validate_amount(amount)
 
+    # Валидация валюты через реестр
+    currency = get_currency(currency_code)
+    code = currency.code
+
+    # Получаем портфель и курсы
     portfolio = get_portfolio(user)
     rates = get_rates()
 
+    # Выполняем покупку (может бросить InsufficientFundsError)
     portfolio.buy_currency(code, amount, rates)
     _save_portfolio(portfolio)
 
+    # Расчет стоимости
     rate = rates.get(code, 1.0)
     cost_usd = amount * rate
 
@@ -365,10 +388,12 @@ def buy_currency(user: User, currency_code: str, amount: float) -> dict:
         "amount": amount,
         "rate": rate,
         "cost_usd": cost_usd,
+        "base_currency": "USD",
         "portfolio": portfolio.get_portfolio_info(),
     }
 
 
+@log_action("SELL", verbose=True)
 def sell_currency(user: User, currency_code: str, amount: float) -> dict:
     """Продать валюту за USD.
 
@@ -379,17 +404,30 @@ def sell_currency(user: User, currency_code: str, amount: float) -> dict:
 
     Returns:
         Результат операции.
+
+    Raises:
+        CurrencyNotFoundError: Если валюта не найдена в реестре.
+        InsufficientFundsError: Если недостаточно валюты для продажи.
+        ValueError: Если amount <= 0.
     """
     require_login(user)
-    code = validate_currency_code(currency_code)
+
+    # Валидация количества
     amount = validate_amount(amount)
 
+    # Валидация валюты через реестр
+    currency = get_currency(currency_code)
+    code = currency.code
+
+    # Получаем портфель и курсы
     portfolio = get_portfolio(user)
     rates = get_rates()
 
+    # Выполняем продажу (может бросить InsufficientFundsError)
     portfolio.sell_currency(code, amount, rates)
     _save_portfolio(portfolio)
 
+    # Расчет выручки
     rate = rates.get(code, 1.0)
     received_usd = amount * rate
 
@@ -399,6 +437,7 @@ def sell_currency(user: User, currency_code: str, amount: float) -> dict:
         "amount": amount,
         "rate": rate,
         "received_usd": received_usd,
+        "base_currency": "USD",
         "portfolio": portfolio.get_portfolio_info(),
     }
 
@@ -444,18 +483,27 @@ def get_exchange_rate_between(from_currency: str, to_currency: str) -> dict:
 
     Returns:
         Информация о курсе обмена.
-    """
-    from_code = validate_currency_code(from_currency)
-    to_code = validate_currency_code(to_currency)
 
+    Raises:
+        CurrencyNotFoundError: Если валюта не найдена в реестре.
+    """
+    # Валидация валют через реестр
+    from_curr = get_currency(from_currency)
+    to_curr = get_currency(to_currency)
+
+    from_code = from_curr.code
+    to_code = to_curr.code
+
+    # Получаем курсы (с проверкой TTL)
     rates_info = get_rates_info()
     rates = rates_info["rates"]
     updated_at = rates_info["updated_at"]
 
+    # Проверяем наличие курсов
     if from_code not in rates:
-        raise ValueError(f"Курс для валюты {from_code} не найден")
+        raise CurrencyNotFoundError(from_code)
     if to_code not in rates:
-        raise ValueError(f"Курс для валюты {to_code} не найден")
+        raise CurrencyNotFoundError(to_code)
 
     # Конвертация через USD
     from_rate = rates[from_code]
