@@ -68,18 +68,6 @@ class User:
         """Получить имя пользователя."""
         return self._username
 
-    @property
-    def registration_date(self) -> datetime:
-        """Получить дату регистрации."""
-        return self._registration_date
-
-    @property
-    def salt(self) -> str:
-        """Получить соль (только для чтения)."""
-        return self._salt
-
-    # --- Сеттеры ---
-
     @username.setter
     def username(self, value: str) -> None:
         """Установить имя пользователя.
@@ -93,6 +81,16 @@ class User:
         if not value or not value.strip():
             raise ValueError("Имя пользователя не может быть пустым")
         self._username = value.strip()
+
+    @property
+    def registration_date(self) -> datetime:
+        """Получить дату регистрации."""
+        return self._registration_date
+
+    @property
+    def salt(self) -> str:
+        """Получить соль (только для чтения)."""
+        return self._salt
 
     # --- Методы ---
 
@@ -159,7 +157,7 @@ class Portfolio:
             user: Объект пользователя-владельца портфеля.
         """
         self._user = user
-        self._wallets: dict[str, "Wallet"] = {}
+        self._wallets: dict[str, Wallet] = {}
 
     # --- Properties ---
 
@@ -180,7 +178,9 @@ class Portfolio:
 
     # --- Методы ---
 
-    def add_currency(self, currency_code: str, initial_balance: float = 0.0) -> "Wallet":
+    def add_currency(
+        self, currency_code: str, initial_balance: float = 0.0
+    ) -> "Wallet":
         """Добавить новый кошелёк в портфель.
 
         Args:
