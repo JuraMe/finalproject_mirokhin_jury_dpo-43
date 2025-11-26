@@ -4,6 +4,7 @@
 ошибок в системе управления валютными портфелями.
 """
 
+from typing import Any
 
 # =============================================================================
 # Исключения для валют
@@ -90,7 +91,8 @@ class WalletNotFoundError(ValueError):
 class InsufficientFundsError(ValueError):
     """Исключение при недостаточном балансе для операции.
 
-    Сообщение: "Недостаточно средств: доступно {available} {code}, требуется {required} {code}"
+    Сообщение: "Недостаточно средств: доступно {available} {code},
+        требуется {required} {code}"
     Выбрасывается: Wallet.withdraw(), usecases.sell_currency()
     """
 
@@ -132,11 +134,13 @@ class TradingError(Exception):
 class DataValidationError(ValueError):
     """Исключение при ошибке валидации данных."""
 
-    def __init__(self, field: str, value: any, reason: str):
+    def __init__(self, field: str, value: Any, reason: str):
         self.field = field
         self.value = value
         self.reason = reason
-        super().__init__(f"Ошибка валидации поля '{field}' со значением '{value}': {reason}")
+        super().__init__(
+            f"Ошибка валидации поля '{field}' со значением '{value}': {reason}"
+        )
 
 
 class DataNotFoundError(FileNotFoundError):
