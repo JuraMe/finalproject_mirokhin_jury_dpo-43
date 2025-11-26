@@ -10,6 +10,11 @@ import sys
 from pathlib import Path
 
 from valutatrade_hub.core import usecases
+from valutatrade_hub.core.exceptions import (
+    ApiRequestError,
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
 from valutatrade_hub.core.models import User
 
 # Файл сессии
@@ -179,6 +184,15 @@ def cmd_buy(args: argparse.Namespace) -> None:
         print(f"{'='*50}\n")
 
         _print_success(f"Куплено {result['amount']:.4f} {result['currency']} за {result['cost_usd']:.2f} USD")
+
+    except CurrencyNotFoundError as e:
+        _print_error(str(e))
+        print("Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH")
+        print("Используйте 'valutatrade get-rate --help' для получения курсов")
+
+    except InsufficientFundsError as e:
+        _print_error(str(e))
+
     except (ValueError, PermissionError) as e:
         _print_error(str(e))
 
@@ -207,6 +221,15 @@ def cmd_sell(args: argparse.Namespace) -> None:
         print(f"{'='*50}\n")
 
         _print_success(f"Продано {result['amount']:.4f} {result['currency']} за {result['received_usd']:.2f} USD")
+
+    except CurrencyNotFoundError as e:
+        _print_error(str(e))
+        print("Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH")
+        print("Используйте 'valutatrade get-rate --help' для получения курсов")
+
+    except InsufficientFundsError as e:
+        _print_error(str(e))
+
     except (ValueError, PermissionError) as e:
         _print_error(str(e))
 
@@ -236,6 +259,16 @@ def cmd_get_rate(args: argparse.Namespace) -> None:
             print(f"Обновлено:        Дефолтные курсы")
 
         print(f"{'='*50}\n")
+
+    except CurrencyNotFoundError as e:
+        _print_error(str(e))
+        print("Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH")
+        print("Используйте 'valutatrade get-rate --from USD --to BTC' для примера")
+
+    except ApiRequestError as e:
+        _print_error(str(e))
+        print("Совет: повторите попытку позже или проверьте подключение к сети")
+
     except ValueError as e:
         _print_error(str(e))
 
