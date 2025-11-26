@@ -9,8 +9,10 @@
 
 from abc import ABC, abstractmethod
 
-from valutatrade_hub.core.exceptions import CurrencyNotFoundError, InvalidCurrencyCodeError
-
+from valutatrade_hub.core.exceptions import (
+    CurrencyNotFoundError,
+    InvalidCurrencyCodeError,
+)
 
 # =============================================================================
 # Абстрактный базовый класс валюты
@@ -66,9 +68,7 @@ class Currency(ABC):
         code_upper = code.upper()
 
         if len(code_upper) < 2 or len(code_upper) > 5:
-            raise InvalidCurrencyCodeError(
-                code, "длина кода должна быть 2-5 символов"
-            )
+            raise InvalidCurrencyCodeError(code, "длина кода должна быть 2-5 символов")
 
         if " " in code_upper:
             raise InvalidCurrencyCodeError(code, "код не может содержать пробелы")
@@ -105,7 +105,8 @@ class FiatCurrency(Currency):
     """Фиатная валюта (государственная валюта).
 
     Дополнительные атрибуты:
-        issuing_country: Страна или зона эмиссии (например, "United States", "Eurozone").
+        issuing_country: Страна или зона эмиссии
+            (например, "United States", "Eurozone").
 
     Пример get_display_info():
         "[FIAT] USD — US Dollar (Issuing: United States)"
@@ -251,6 +252,7 @@ def is_currency_registered(code: str) -> bool:
 # Инициализация базовых валют
 # =============================================================================
 
+
 def _init_default_currencies() -> None:
     """Инициализация базового набора валют."""
     # Фиатные валюты
@@ -262,12 +264,8 @@ def _init_default_currencies() -> None:
     register_currency(FiatCurrency("Japanese Yen", "JPY", "Japan"))
 
     # Криптовалюты
-    register_currency(
-        CryptoCurrency("Bitcoin", "BTC", "SHA-256", market_cap=1.12e12)
-    )
-    register_currency(
-        CryptoCurrency("Ethereum", "ETH", "Ethash", market_cap=4.5e11)
-    )
+    register_currency(CryptoCurrency("Bitcoin", "BTC", "SHA-256", market_cap=1.12e12))
+    register_currency(CryptoCurrency("Ethereum", "ETH", "Ethash", market_cap=4.5e11))
 
 
 # Инициализация при импорте модуля
