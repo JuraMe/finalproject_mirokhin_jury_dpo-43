@@ -1,7 +1,22 @@
+# Виртуальные окружения
 .venv/
-dist/
+venv/
 __pycache__/
 *.pyc
+
+# Сборки и установочные файлы
+dist/
+build/
+*.egg-info/
+
+# Логи и кэш
+*.log
+logs/
+ruff_cache/
+
+# Системные файлы macOS
+.idea/
+
+# Данные проекта
 data/
-db_meta.json
-config.json
+*.json
