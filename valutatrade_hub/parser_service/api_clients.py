@@ -113,8 +113,10 @@ class BaseApiClient(ABC):
 
             except requests.exceptions.ConnectionError as e:
                 last_exception = e
+                error_msg = str(e)[:100]
                 logger.warning(
-                    f"Ошибка соединения (попытка {attempt + 1}/{retries}): {str(e)[:100]}"
+                    f"Ошибка соединения (попытка {attempt + 1}/{retries}): "
+                    f"{error_msg}"
                 )
 
             except requests.exceptions.RequestException as e:
@@ -187,7 +189,8 @@ class CoinGeckoClient(BaseApiClient):
 
             if not rates:
                 raise ApiRequestError(
-                    "CoinGecko API вернул пустой результат или данные в неожиданном формате"
+                    "CoinGecko API вернул пустой результат или "
+                    "данные в неожиданном формате"
                 )
 
             logger.info(f"✓ Получено {len(rates)} курсов криптовалют от CoinGecko")
