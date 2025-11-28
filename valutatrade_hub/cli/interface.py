@@ -17,7 +17,11 @@ from valutatrade_hub.core.exceptions import (
     StorageError,
 )
 from valutatrade_hub.core.models import User
-from valutatrade_hub.parser_service.updater import update_all_rates
+from valutatrade_hub.parser_service.api_clients import (
+    CoinGeckoClient,
+    ExchangeRateApiClient,
+)
+from valutatrade_hub.parser_service.updater import RatesUpdater, update_all_rates
 
 # Файл сессии
 SESSION_FILE = Path(__file__).parent.parent.parent / "data" / ".session"
@@ -291,24 +295,63 @@ def cmd_get_rate(args: argparse.Namespace) -> None:
 def cmd_update_rates(args: argparse.Namespace) -> None:
     """Команда update-rates — обновить курсы валют из внешних API.
 
-    Получает актуальные курсы от CoinGecko и ExchangeRate-API,
+    Получает актуальные курсы от CoinGecko и/или ExchangeRate-API,
     сохраняет в кеш и историю.
 
     Аргументы:
-        Нет обязательных аргументов.
+        --source <str> (опционально) — источник данных:
+            - 'coingecko' — только криптовалюты
+            - 'exchangerate' — только фиат
+            - по умолчанию — все источники
     """
     try:
+        # Определение источника
+        source = args.source if hasattr(args, "source") and args.source else None
+
+        # Вывод заголовка
         print("\nОбновление курсов валют...")
+        if source:
+            source_name = {
+                "coingecko": "CoinGecko (криптовалюты)",
+                "exchangerate": "ExchangeRate-API (фиат)",
+            }.get(source, source)
+            print(f"Источник: {source_name}")
+        else:
+            print("Источники: все (CoinGecko + ExchangeRate-API)")
         print("=" * 60)
 
-        stats = update_all_rates()
+        # Инициализация RatesUpdater с выбранными клиентами
+        if source:
+            # Создание клиента для конкретного источника
+            clients = []
+            if source == "coingecko":
+                clients.append(CoinGeckoClient())
+            elif source == "exchangerate":
+                clients.append(ExchangeRateApiClient())
+            else:
+                _print_error(
+                    f"Неизвестный источник: {source}. "
+                    "Допустимые значения: coingecko, exchangerate"
+                )
+                return
 
+            # Использование RatesUpdater с выбранными клиентами
+            updater = RatesUpdater(clients=clients)
+            stats = updater.run_update()
+        else:
+            # Обновление от всех источников
+            stats = update_all_rates()
+
+        # Вывод результатов
         print("\n" + "=" * 60)
         print("Результаты обновления:")
         print("=" * 60)
         print(f"  Всего пар обновлено:      {stats['total_count']}")
         print(f"  Криптовалютные пары:      {stats['crypto_count']}")
         print(f"  Фиатные валютные пары:    {stats['fiat_count']}")
+        if "success" in stats:
+            print(f"  Успешных источников:      {stats['success']}")
+            print(f"  Неудачных источников:     {stats['failed']}")
         print(f"  Ошибок при обновлении:    {stats['errors']}")
         print("=" * 60)
 
@@ -469,6 +512,13 @@ def create_parser() -> argparse.ArgumentParser:
     update_rates_parser = subparsers.add_parser(
         "update-rates",
         help="Обновить курсы валют из внешних API (CoinGecko, ExchangeRate-API)",
+    )
+    update_rates_parser.add_argument(
+        "--source",
+        type=str,
+        choices=["coingecko", "exchangerate"],
+        help="Источник данных: 'coingecko' (криптовалюты) или 'exchangerate' (фиат). "
+        "По умолчанию обновляются все источники.",
     )
     update_rates_parser.set_defaults(func=cmd_update_rates)
 
