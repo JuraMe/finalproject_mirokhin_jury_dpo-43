@@ -430,6 +430,11 @@ python main.py show-portfolio
 
 ---
 
+### Демонстрация (asciinema)
+[![asciicast](https://asciinema.org/a/YIeZ8jYbRO3Ysjj4ieE7FPhIb.svg)](https://asciinema.org/a/YIeZ8jYbRO3Ysjj4ieE7FPhIb)
+
+---
+
 ## Лицензия
 
 MIT License
@@ -439,5 +444,6 @@ MIT License
 ## Автор
 
 Jury Mirokhin (m@jura.me)
+МИФИ-ДПО-43 
 
 Проект выполнен в рамках курса **«Специалист по работе с данными и применению ИИ»** МИФИ.
