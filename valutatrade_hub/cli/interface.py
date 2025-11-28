@@ -21,6 +21,8 @@ from valutatrade_hub.parser_service.api_clients import (
     CoinGeckoClient,
     ExchangeRateApiClient,
 )
+from valutatrade_hub.parser_service.config import get_parser_config
+from valutatrade_hub.parser_service.storage import read_rates_cache
 from valutatrade_hub.parser_service.updater import RatesUpdater, update_all_rates
 
 # Файл сессии
@@ -292,6 +294,154 @@ def cmd_get_rate(args: argparse.Namespace) -> None:
         _print_error(str(e))
 
 
+def cmd_show_rates(args: argparse.Namespace) -> None:
+    """Команда show-rates — показать актуальные курсы из локального кеша.
+
+    Аргументы:
+        --currency <str> — показать курс только для указанной валюты
+        --top <int> — показать N самых дорогих криптовалют
+        --base <str> — показать курсы относительно указанной базы
+    """
+    try:
+        # Чтение данных из кеша
+        cache_data = read_rates_cache()
+
+        # Определение формата файла и извлечение данных
+        if "pairs" in cache_data:
+            # Новый формат
+            pairs = cache_data["pairs"]
+            last_refresh = cache_data.get("last_refresh")
+        else:
+            # Старый формат - конвертируем в новый
+            old_rates = cache_data.get("rates", {})
+            base_currency = cache_data.get("base_currency", "USD")
+            updated_at = cache_data.get("updated_at")
+
+            pairs = {}
+            for currency, rate in old_rates.items():
+                if currency != base_currency:
+                    pair_key = f"{currency}_{base_currency}"
+                    pairs[pair_key] = {
+                        "rate": float(rate),
+                        "updated_at": updated_at,
+                        "source": "legacy",
+                    }
+            last_refresh = updated_at
+
+        if not pairs:
+            print("\nКеш курсов пуст.")
+            print("Выполните команду 'update-rates' для получения актуальных данных.")
+            return
+
+        # Применение фильтров
+        filtered_pairs = {}
+
+        # Фильтр --currency
+        if hasattr(args, "currency") and args.currency:
+            currency_upper = args.currency.upper()
+            for pair_key, pair_data in pairs.items():
+                from_currency, to_currency = pair_key.split("_")
+                if from_currency == currency_upper:
+                    filtered_pairs[pair_key] = pair_data
+        else:
+            filtered_pairs = pairs.copy()
+
+        # Фильтр --top (для криптовалют)
+        if hasattr(args, "top") and args.top:
+            config = get_parser_config()
+            crypto_pairs = {}
+            for pair_key, pair_data in filtered_pairs.items():
+                from_currency, _ = pair_key.split("_")
+                if from_currency in config.CRYPTO_CURRENCIES:
+                    crypto_pairs[pair_key] = pair_data
+
+            # Сортировка по убыванию курса и ограничение топа
+            sorted_crypto = sorted(
+                crypto_pairs.items(), key=lambda x: x[1]["rate"], reverse=True
+            )
+            filtered_pairs = dict(sorted_crypto[: args.top])
+
+        # Пересчет относительно другой базы (--base)
+        if hasattr(args, "base") and args.base:
+            base_upper = args.base.upper()
+
+            # Находим курс базовой валюты к USD
+            base_to_usd = None
+            for pair_key, pair_data in pairs.items():
+                from_currency, to_currency = pair_key.split("_")
+                if from_currency == base_upper and to_currency == "USD":
+                    base_to_usd = pair_data["rate"]
+                    break
+
+            if base_to_usd is None:
+                _print_error(
+                    f"Не удалось найти курс {base_upper}_USD для пересчета. "
+                    f"Доступные валюты: {', '.join(set(p.split('_')[0] for p in pairs.keys()))}"
+                )
+                return
+
+            # Пересчет всех курсов относительно новой базы
+            recalculated_pairs = {}
+            for pair_key, pair_data in filtered_pairs.items():
+                from_currency, to_currency = pair_key.split("_")
+                if from_currency != base_upper:  # Не показываем базу к самой себе
+                    # Курс от валюты к USD, затем к новой базе
+                    rate_to_usd = pair_data["rate"]
+                    rate_to_base = rate_to_usd / base_to_usd
+                    new_pair_key = f"{from_currency}_{base_upper}"
+                    recalculated_pairs[new_pair_key] = {
+                        "rate": rate_to_base,
+                        "updated_at": pair_data["updated_at"],
+                        "source": pair_data.get("source", "unknown"),
+                    }
+            filtered_pairs = recalculated_pairs
+
+        if not filtered_pairs:
+            print("\nНе найдено курсов по заданным фильтрам.")
+            return
+
+        # Сортировка по алфавиту (по умолчанию)
+        sorted_pairs = sorted(filtered_pairs.items())
+
+        # Вывод отформатированной таблицы
+        print("\n" + "=" * 80)
+        print("Актуальные курсы валют (из локального кеша)")
+        if last_refresh:
+            print(f"Последнее обновление: {last_refresh}")
+        print("=" * 80)
+
+        # Заголовок таблицы
+        print(
+            f"{'Пара':<15} {'Курс':>18} {'Источник':<20} {'Обновлено':<25}"
+        )
+        print("-" * 80)
+
+        # Вывод данных
+        for pair_key, pair_data in sorted_pairs:
+            rate = pair_data["rate"]
+            source = pair_data.get("source", "unknown")
+            updated_at = pair_data.get("updated_at", "N/A")
+
+            print(
+                f"{pair_key:<15} {rate:>18,.6f} {source:<20} {updated_at:<25}"
+            )
+
+        print("-" * 80)
+        print(f"Всего пар: {len(sorted_pairs)}")
+        print("=" * 80 + "\n")
+
+    except FileNotFoundError:
+        _print_error("Файл кеша rates.json не найден.")
+        print("Выполните команду 'update-rates' для создания кеша.")
+
+    except StorageError as e:
+        _print_error(f"Ошибка чтения кеша: {str(e)}")
+
+    except Exception as e:
+        _print_error(f"Неожиданная ошибка: {str(e)}")
+        print("Совет: проверьте формат файла rates.json")
+
+
 def cmd_update_rates(args: argparse.Namespace) -> None:
     """Команда update-rates — обновить курсы валют из внешних API.
 
@@ -507,6 +657,28 @@ def create_parser() -> argparse.ArgumentParser:
         help="Целевая валюта (например, BTC)",
     )
     get_rate_parser.set_defaults(func=cmd_get_rate)
+
+    # --- show-rates ---
+    show_rates_parser = subparsers.add_parser(
+        "show-rates",
+        help="Показать актуальные курсы из локального кеша",
+    )
+    show_rates_parser.add_argument(
+        "--currency",
+        type=str,
+        help="Показать курс только для указанной валюты (например, BTC)",
+    )
+    show_rates_parser.add_argument(
+        "--top",
+        type=int,
+        help="Показать N самых дорогих криптовалют (например, --top 3)",
+    )
+    show_rates_parser.add_argument(
+        "--base",
+        type=str,
+        help="Показать курсы относительно указанной базовой валюты (например, EUR)",
+    )
+    show_rates_parser.set_defaults(func=cmd_show_rates)
 
     # --- update-rates ---
     update_rates_parser = subparsers.add_parser(
