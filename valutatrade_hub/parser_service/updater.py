@@ -11,7 +11,12 @@ import time
 from datetime import datetime
 
 from valutatrade_hub.core.exceptions import ApiRequestError, StorageError
-from valutatrade_hub.parser_service.api_clients import get_api_clients
+from valutatrade_hub.parser_service.api_clients import (
+    BaseApiClient,
+    CoinGeckoClient,
+    ExchangeRateApiClient,
+    get_api_clients,
+)
 from valutatrade_hub.parser_service.config import ParserConfig, get_parser_config
 from valutatrade_hub.parser_service.storage import (
     add_history_record,
@@ -22,163 +27,230 @@ from valutatrade_hub.parser_service.storage import (
 logger = logging.getLogger(__name__)
 
 
+class RatesUpdater:
+    """Координатор обновления курсов валют.
+
+    Точка входа для логики парсинга. Опрашивает все API клиенты,
+    объединяет данные и сохраняет в хранилище.
+
+    Attributes:
+        config: Конфигурация Parser Service.
+        clients: Список API клиентов для опроса.
+    """
+
+    def __init__(
+        self,
+        clients: list[BaseApiClient] | None = None,
+        config: ParserConfig | None = None,
+    ):
+        """Инициализация координатора обновлений.
+
+        Args:
+            clients: Список API клиентов (опционально).
+                Если не указан, создаются клиенты для CoinGecko и ExchangeRate-API.
+            config: Конфигурация Parser Service (опционально).
+        """
+        self.config = config or get_parser_config()
+
+        if clients is None:
+            # Создаем клиенты по умолчанию
+            coingecko, exchangerate = get_api_clients(self.config)
+            self.clients = [coingecko, exchangerate]
+        else:
+            self.clients = clients
+
+    def run_update(self) -> dict[str, int]:
+        """Выполнить обновление курсов валют.
+
+        Основной метод координации:
+        1. Вызывает fetch_rates() у каждого клиента
+        2. Объединяет полученные словари с курсами
+        3. Добавляет метаданные (source, last_refresh)
+        4. Передает в storage для сохранения
+        5. Ведет подробное логирование каждого шага
+
+        Returns:
+            Статистика обновления:
+            {
+                "crypto_count": 3,
+                "fiat_count": 5,
+                "total_count": 8,
+                "errors": 0,
+                "success": 2,
+                "failed": 0
+            }
+
+        Raises:
+            ApiRequestError: Если все API запросы завершились неудачей.
+            StorageError: Если данные не могут быть сохранены.
+        """
+        logger.info("=" * 60)
+        logger.info("Starting currency rates update...")
+        logger.info("=" * 60)
+
+        timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        start_time = time.time()
+
+        stats = {
+            "crypto_count": 0,
+            "fiat_count": 0,
+            "total_count": 0,
+            "errors": 0,
+            "success": 0,
+            "failed": 0,
+        }
+
+        all_rates = {}
+        errors = []
+
+        # Опрос каждого клиента
+        for i, client in enumerate(self.clients, 1):
+            client_name = client.__class__.__name__
+            logger.info(f"\n[{i}/{len(self.clients)}] Fetching rates from {client_name}...")
+            client_start = time.time()
+
+            try:
+                # Получение курсов от клиента
+                rates = client.fetch_rates()
+
+                # Определение источника для метаданных
+                if isinstance(client, CoinGeckoClient):
+                    source = "CoinGecko"
+                    stats["crypto_count"] = len(rates)
+                elif isinstance(client, ExchangeRateApiClient):
+                    source = "ExchangeRate-API"
+                    stats["fiat_count"] = len(rates)
+                else:
+                    source = client_name
+
+                # Объединение с общим словарем
+                all_rates.update(rates)
+
+                # Сохранение каждой пары в историю
+                for pair, rate in rates.items():
+                    from_currency, _ = pair.split("_")
+                    raw_id = self.config.CRYPTO_ID_MAP.get(from_currency)
+
+                    add_history_record(
+                        pair=pair,
+                        rate=rate,
+                        source=source,
+                        timestamp=timestamp,
+                        raw_id=raw_id,
+                        request_ms=int((time.time() - client_start) * 1000),
+                        status_code=200,
+                        config=self.config,
+                    )
+
+                elapsed = time.time() - client_start
+                logger.info(
+                    f"✓ Successfully fetched {len(rates)} rates from {client_name} "
+                    f"in {elapsed:.2f}s"
+                )
+                stats["success"] += 1
+
+            except ApiRequestError as e:
+                # Отказоустойчивость: логируем ошибку, но продолжаем
+                logger.error(f"✗ Failed to fetch rates from {client_name}: {str(e)}")
+                errors.append(f"{client_name}: {str(e)}")
+                stats["errors"] += 1
+                stats["failed"] += 1
+
+            except Exception as e:
+                # Неожиданная ошибка
+                logger.error(
+                    f"✗ Unexpected error from {client_name}: {str(e)}",
+                    exc_info=True,
+                )
+                errors.append(f"{client_name}: {str(e)}")
+                stats["errors"] += 1
+                stats["failed"] += 1
+
+        # Проверка получения данных
+        if not all_rates:
+            error_msg = "Failed to fetch rates from all sources. " + "; ".join(errors)
+            logger.error(f"✗ {error_msg}")
+            raise ApiRequestError(error_msg)
+
+        # Обновление кеша
+        logger.info(f"\nUpdating rates cache with {len(all_rates)} pairs...")
+        try:
+            # Группировка по источникам для сохранения метаданных
+            crypto_rates = {}
+            fiat_rates = {}
+
+            for pair, rate in all_rates.items():
+                from_currency, _ = pair.split("_")
+                if from_currency in [c for c in self.config.CRYPTO_CURRENCIES]:
+                    crypto_rates[pair] = rate
+                else:
+                    fiat_rates[pair] = rate
+
+            # Обновление курсов криптовалют в кеше
+            if crypto_rates:
+                update_rates_cache(
+                    crypto_rates,
+                    source="CoinGecko",
+                    timestamp=timestamp,
+                    config=self.config,
+                )
+
+            # Обновление курсов фиатных валют в кеше
+            if fiat_rates:
+                update_rates_cache(
+                    fiat_rates,
+                    source="ExchangeRate-API",
+                    timestamp=timestamp,
+                    config=self.config,
+                )
+
+            logger.info("✓ Cache updated successfully")
+
+        except StorageError as e:
+            logger.error(f"✗ Failed to update cache: {str(e)}")
+            stats["errors"] += 1
+            raise
+
+        # Финальная статистика
+        stats["total_count"] = len(all_rates)
+        elapsed = time.time() - start_time
+
+        logger.info("\n" + "=" * 60)
+        logger.info("Update completed successfully!")
+        logger.info(f"  Total pairs: {stats['total_count']}")
+        logger.info(f"  Crypto pairs: {stats['crypto_count']}")
+        logger.info(f"  Fiat pairs: {stats['fiat_count']}")
+        logger.info(f"  Successful clients: {stats['success']}")
+        logger.info(f"  Failed clients: {stats['failed']}")
+        logger.info(f"  Errors: {stats['errors']}")
+        logger.info(f"  Elapsed time: {elapsed:.2f}s")
+        logger.info("=" * 60)
+
+        return stats
+
+
+# =============================================================================
+# Convenience functions для обратной совместимости
+# =============================================================================
+
+
 def update_all_rates(config: ParserConfig | None = None) -> dict[str, int]:
     """Обновить все курсы валют из внешних API.
 
-    Получает курсы от CoinGecko (крипта) и ExchangeRate-API (фиат),
-    сохраняет в историю и кеш.
+    Convenience функция, которая создает RatesUpdater и вызывает run_update().
 
     Args:
         config: ParserConfig instance (опционально)
 
     Returns:
-        Статистика обновления:
-        {
-            "crypto_count": 3,
-            "fiat_count": 5,
-            "total_count": 8,
-            "errors": 0
-        }
+        Статистика обновления от RatesUpdater.run_update()
 
     Raises:
         ApiRequestError: Если все API запросы завершились неудачей.
         StorageError: Если данные не могут быть сохранены.
     """
-    cfg = config or get_parser_config()
-
-    logger.info("=" * 60)
-    logger.info("Starting currency rates update...")
-    logger.info("=" * 60)
-
-    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    start_time = time.time()
-
-    stats = {
-        "crypto_count": 0,
-        "fiat_count": 0,
-        "total_count": 0,
-        "errors": 0,
-    }
-
-    all_rates = {}
-    errors = []
-    crypto_rates = {}
-    fiat_rates = {}
-
-    # Получение API клиентов
-    coingecko, exchangerate = get_api_clients(cfg)
-
-    # Получение курсов криптовалют
-    logger.info("\n[1/2] Fetching cryptocurrency rates from CoinGecko...")
-    crypto_start = time.time()
-    try:
-        crypto_rates = coingecko.fetch_rates()
-        all_rates.update(crypto_rates)
-        stats["crypto_count"] = len(crypto_rates)
-
-        # Сохранение в историю
-        for pair, rate in crypto_rates.items():
-            from_currency, _ = pair.split("_")
-            raw_id = cfg.CRYPTO_ID_MAP.get(from_currency)
-            add_history_record(
-                pair=pair,
-                rate=rate,
-                source="CoinGecko",
-                timestamp=timestamp,
-                raw_id=raw_id,
-                request_ms=int((time.time() - crypto_start) * 1000),
-                status_code=200,
-                config=cfg,
-            )
-
-        logger.info(
-            f"✓ Fetched {len(crypto_rates)} crypto rates "
-            f"in {time.time() - crypto_start:.2f}s"
-        )
-
-    except ApiRequestError as e:
-        logger.error(f"✗ Failed to fetch crypto rates: {str(e)}")
-        errors.append(f"CoinGecko: {str(e)}")
-        stats["errors"] += 1
-
-    # Получение курсов фиатных валют
-    logger.info("\n[2/2] Fetching fiat currency rates from ExchangeRate-API...")
-    fiat_start = time.time()
-    try:
-        fiat_rates = exchangerate.fetch_rates()
-        all_rates.update(fiat_rates)
-        stats["fiat_count"] = len(fiat_rates)
-
-        # Сохранение в историю
-        for pair, rate in fiat_rates.items():
-            add_history_record(
-                pair=pair,
-                rate=rate,
-                source="ExchangeRate-API",
-                timestamp=timestamp,
-                request_ms=int((time.time() - fiat_start) * 1000),
-                status_code=200,
-                config=cfg,
-            )
-
-        logger.info(
-            f"✓ Fetched {len(fiat_rates)} fiat rates "
-            f"in {time.time() - fiat_start:.2f}s"
-        )
-
-    except ApiRequestError as e:
-        logger.error(f"✗ Failed to fetch fiat rates: {str(e)}")
-        errors.append(f"ExchangeRate-API: {str(e)}")
-        stats["errors"] += 1
-
-    # Проверка получения данных
-    if not all_rates:
-        error_msg = "Failed to fetch rates from all sources. " + "; ".join(errors)
-        logger.error(f"✗ {error_msg}")
-        raise ApiRequestError(error_msg)
-
-    # Обновление кеша
-    logger.info(f"\nUpdating rates cache with {len(all_rates)} pairs...")
-    try:
-        # Обновление курсов криптовалют в кеше
-        if crypto_rates:
-            update_rates_cache(
-                crypto_rates,
-                source="CoinGecko",
-                timestamp=timestamp,
-                config=cfg,
-            )
-
-        # Обновление курсов фиатных валют в кеше
-        if fiat_rates:
-            update_rates_cache(
-                fiat_rates,
-                source="ExchangeRate-API",
-                timestamp=timestamp,
-                config=cfg,
-            )
-
-        logger.info("✓ Cache updated successfully")
-
-    except StorageError as e:
-        logger.error(f"✗ Failed to update cache: {str(e)}")
-        stats["errors"] += 1
-        raise
-
-    # Финальная статистика
-    stats["total_count"] = len(all_rates)
-    elapsed = time.time() - start_time
-
-    logger.info("\n" + "=" * 60)
-    logger.info("Update completed successfully!")
-    logger.info(f"  Total pairs: {stats['total_count']}")
-    logger.info(f"  Crypto pairs: {stats['crypto_count']}")
-    logger.info(f"  Fiat pairs: {stats['fiat_count']}")
-    logger.info(f"  Errors: {stats['errors']}")
-    logger.info(f"  Elapsed time: {elapsed:.2f}s")
-    logger.info("=" * 60)
-
-    return stats
+    updater = RatesUpdater(config=config)
+    return updater.run_update()
 
 
 def update_crypto_rates(config: ParserConfig | None = None) -> dict[str, float]:
