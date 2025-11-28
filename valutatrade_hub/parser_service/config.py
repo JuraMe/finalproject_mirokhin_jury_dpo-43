@@ -122,7 +122,10 @@ class ParserConfig:
             >>> url = config.get_exchangerate_url()
             >>> # https://v6.exchangerate-api.com/v6/{API_KEY}/latest/USD
         """
-        return f"{self.EXCHANGERATE_API_URL}/{self.EXCHANGERATE_API_KEY}/latest/{self.BASE_CURRENCY}"
+        return (
+            f"{self.EXCHANGERATE_API_URL}/{self.EXCHANGERATE_API_KEY}"
+            f"/latest/{self.BASE_CURRENCY}"
+        )
 
     def get_coingecko_url(self) -> str:
         """Получить полный URL для CoinGecko API.
