@@ -6,7 +6,6 @@
 
 import logging
 import threading
-import time
 from datetime import datetime
 
 from valutatrade_hub.parser_service.config import ParserConfig, get_parser_config
@@ -39,7 +38,7 @@ class RatesScheduler:
         self.config = config or get_parser_config()
         self.interval = interval
         self.running = False
-        self.thread = None
+        self.thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
     def _run_scheduler(self) -> None:
@@ -55,7 +54,7 @@ class RatesScheduler:
                     f"\n[Scheduler] Starting scheduled update at "
                     f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}"
                 )
-                stats = update_all_rates(self.config)
+                update_all_rates(self.config)
 
                 logger.info(
                     f"[Scheduler] Update completed. Next update in {self.interval}s"
