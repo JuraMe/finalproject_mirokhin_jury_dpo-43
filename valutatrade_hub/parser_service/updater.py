@@ -106,7 +106,9 @@ class RatesUpdater:
         # Опрос каждого клиента
         for i, client in enumerate(self.clients, 1):
             client_name = client.__class__.__name__
-            logger.info(f"\n[{i}/{len(self.clients)}] Fetching rates from {client_name}...")
+            logger.info(
+                f"\n[{i}/{len(self.clients)}] Fetching rates from {client_name}..."
+            )
             client_start = time.time()
 
             try:
@@ -181,7 +183,7 @@ class RatesUpdater:
 
             for pair, rate in all_rates.items():
                 from_currency, _ = pair.split("_")
-                if from_currency in [c for c in self.config.CRYPTO_CURRENCIES]:
+                if from_currency in list(self.config.CRYPTO_CURRENCIES):
                     crypto_rates[pair] = rate
                 else:
                     fiat_rates[pair] = rate
@@ -291,7 +293,9 @@ def update_crypto_rates(config: ParserConfig | None = None) -> dict[str, float]:
         )
 
     # Обновление кеша
-    update_rates_cache(crypto_rates, source="CoinGecko", timestamp=timestamp, config=cfg)
+    update_rates_cache(
+        crypto_rates, source="CoinGecko", timestamp=timestamp, config=cfg
+    )
 
     logger.info(f"✓ Updated {len(crypto_rates)} crypto rates")
     return crypto_rates
