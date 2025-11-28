@@ -169,6 +169,42 @@ def cmd_show_portfolio(args: argparse.Namespace) -> None:
         _print_error(str(e))
 
 
+def cmd_deposit(args: argparse.Namespace) -> None:
+    """Команда deposit — пополнить кошелёк валютой.
+
+    Аргументы:
+        --currency <str> — код валюты.
+        --amount <float> — сумма пополнения.
+    """
+    if _current_user is None:
+        _print_error("Требуется авторизация. Выполните команду login.")
+        return
+
+    try:
+        result = usecases.deposit(_current_user, args.currency, args.amount)
+
+        print(f"\n{'=' * 50}")
+        print("Пополнение кошелька выполнено успешно!")
+        print(f"{'=' * 50}")
+        print(f"Валюта:    {result['currency_code']}")
+        print(f"Баланс:    {result['balance']:.4f}")
+        print(f"{'=' * 50}\n")
+
+        _print_success(
+            f"Добавлено {args.amount:.4f} {args.currency}. "
+            f"Новый баланс: {result['balance']:.4f} {result['currency_code']}"
+        )
+
+    except CurrencyNotFoundError as e:
+        _print_error(str(e))
+        print(
+            "Подсказка: поддерживаемые валюты — USD, EUR, GBP, RUB, CNY, JPY, BTC, ETH"
+        )
+
+    except (ValueError, PermissionError) as e:
+        _print_error(str(e))
+
+
 def cmd_buy(args: argparse.Namespace) -> None:
     """Команда buy — купить валюту за USD.
 
@@ -599,6 +635,25 @@ def create_parser() -> argparse.ArgumentParser:
         help="Базовая валюта для расчёта (по умолчанию USD)",
     )
     show_portfolio_parser.set_defaults(func=cmd_show_portfolio)
+
+    # --- deposit ---
+    deposit_parser = subparsers.add_parser(
+        "deposit",
+        help="Пополнить кошелёк валютой",
+    )
+    deposit_parser.add_argument(
+        "--currency",
+        type=str,
+        required=True,
+        help="Код валюты (например, USD, EUR, BTC)",
+    )
+    deposit_parser.add_argument(
+        "--amount",
+        type=float,
+        required=True,
+        help="Сумма пополнения",
+    )
+    deposit_parser.set_defaults(func=cmd_deposit)
 
     # --- buy ---
     buy_parser = subparsers.add_parser(
