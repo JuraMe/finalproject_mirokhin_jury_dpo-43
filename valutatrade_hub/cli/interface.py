@@ -18,6 +18,7 @@ from valutatrade_hub.core.exceptions import (
 )
 from valutatrade_hub.core.models import User
 from valutatrade_hub.parser_service.api_clients import (
+    BaseApiClient,
     CoinGeckoClient,
     ExchangeRateApiClient,
 )
@@ -410,9 +411,10 @@ def cmd_show_rates(args: argparse.Namespace) -> None:
                     break
 
             if base_to_usd is None:
+                available = {p.split("_")[0] for p in pairs}
                 _print_error(
                     f"Не удалось найти курс {base_upper}_USD для пересчета. "
-                    f"Доступные валюты: {', '.join(set(p.split('_')[0] for p in pairs.keys()))}"
+                    f"Доступные валюты: {', '.join(available)}"
                 )
                 return
 
@@ -509,7 +511,7 @@ def cmd_update_rates(args: argparse.Namespace) -> None:
         # Инициализация RatesUpdater с выбранными клиентами
         if source:
             # Создание клиента для конкретного источника
-            clients = []
+            clients: list[BaseApiClient] = []
             if source == "coingecko":
                 clients.append(CoinGeckoClient())
             elif source == "exchangerate":
