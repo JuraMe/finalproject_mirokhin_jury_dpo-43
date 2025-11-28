@@ -333,7 +333,8 @@ def read_rates_cache(config: ParserConfig | None = None) -> dict[str, Any]:
         # Поддержка миграции старого формата
         if "rates" in data and "pairs" not in data:
             logger.info("Migrating old rates.json format to new format")
-            # Старый формат: {"rates": {"USD": 1.0, "EUR": 1.08}, "base_currency": "USD", ...}
+            # Старый формат: {"rates": {"USD": 1.0, "EUR": 1.08},
+            #                 "base_currency": "USD", ...}
             # Новый формат: {"pairs": {"EUR_USD": {"rate": 1.08, ...}}, ...}
             old_rates = data.get("rates", {})
             base_currency = data.get("base_currency", "USD")
