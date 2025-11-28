@@ -14,8 +14,10 @@ from valutatrade_hub.core.exceptions import (
     ApiRequestError,
     CurrencyNotFoundError,
     InsufficientFundsError,
+    StorageError,
 )
 from valutatrade_hub.core.models import User
+from valutatrade_hub.parser_service.updater import update_all_rates
 
 # Файл сессии
 SESSION_FILE = Path(__file__).parent.parent.parent / "data" / ".session"
@@ -286,6 +288,54 @@ def cmd_get_rate(args: argparse.Namespace) -> None:
         _print_error(str(e))
 
 
+def cmd_update_rates(args: argparse.Namespace) -> None:
+    """Команда update-rates — обновить курсы валют из внешних API.
+
+    Получает актуальные курсы от CoinGecko и ExchangeRate-API,
+    сохраняет в кеш и историю.
+
+    Аргументы:
+        Нет обязательных аргументов.
+    """
+    try:
+        print("\nОбновление курсов валют...")
+        print("=" * 60)
+
+        stats = update_all_rates()
+
+        print("\n" + "=" * 60)
+        print("Результаты обновления:")
+        print("=" * 60)
+        print(f"  Всего пар обновлено:      {stats['total_count']}")
+        print(f"  Криптовалютные пары:      {stats['crypto_count']}")
+        print(f"  Фиатные валютные пары:    {stats['fiat_count']}")
+        print(f"  Ошибок при обновлении:    {stats['errors']}")
+        print("=" * 60)
+
+        if stats["errors"] == 0:
+            _print_success(
+                f"Курсы успешно обновлены! "
+                f"Обновлено {stats['total_count']} валютных пар."
+            )
+        else:
+            print(
+                "\nВнимание: при обновлении произошли ошибки. "
+                "Проверьте логи для деталей."
+            )
+
+    except ApiRequestError as e:
+        _print_error(f"Ошибка при запросе к API: {str(e)}")
+        print("Совет: проверьте подключение к интернету и API ключи")
+
+    except StorageError as e:
+        _print_error(f"Ошибка при сохранении данных: {str(e)}")
+        print("Совет: проверьте права доступа к директории data/")
+
+    except Exception as e:
+        _print_error(f"Неожиданная ошибка: {str(e)}")
+        print("Совет: повторите попытку или обратитесь к документации")
+
+
 # =============================================================================
 # CLI Setup
 # =============================================================================
@@ -414,6 +464,13 @@ def create_parser() -> argparse.ArgumentParser:
         help="Целевая валюта (например, BTC)",
     )
     get_rate_parser.set_defaults(func=cmd_get_rate)
+
+    # --- update-rates ---
+    update_rates_parser = subparsers.add_parser(
+        "update-rates",
+        help="Обновить курсы валют из внешних API (CoinGecko, ExchangeRate-API)",
+    )
+    update_rates_parser.set_defaults(func=cmd_update_rates)
 
     return parser
 
